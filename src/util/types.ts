@@ -8,3 +8,9 @@ export interface Sale{
     price: number,
     amount: number
 }
+
+export interface SaleStepOutput{
+    remainingSellOrders: Order[];
+    remainingBuyOrders: Order[];
+    sales: Sale[];
+}
