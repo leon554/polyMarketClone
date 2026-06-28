@@ -3,17 +3,20 @@ import type { Order, Sale, SaleStepOutput } from "../util/types"
 import { Chart} from "chart-le"
 import { getChartParameters } from "../util/chartUtil"
 import Button from "./Button"
-import { generateRandomOrder, makeSales, peek } from "../util/util"
+import { generateRandomOrder, makeSales} from "../util/marketUtil"
+import { peek } from "../util/util"
+import { addToOrderMap} from "../util/util"
 
 export default function BetCard() {
     const canvasID = useRef<HTMLCanvasElement | null>(null)
-    const [buyOrders, setBuyOrders] = useState<Order[]>([])
-    const [sellOrders, setSellOrders] = useState<Order[]>([])
+    const [buyOrders, setBuyOrders] = useState<Map<number, Order>>(new Map())
+    const [sellOrders, setSellOrders] = useState<Map<number, Order>>(new Map())
     const chart = useRef<Chart | null>(null)
     const [price, setPrice] = useState<string>("")
     const [amount, setAmount] = useState<string>("")
     const [sales, setSales] = useState<Sale[]>([])
     const salesRef = useRef(sales)
+    const [autoOrders, setAutoOrders] = useState(false)
 
     useEffect(() => {
         const canvas = canvasID.current as HTMLCanvasElement
@@ -24,25 +27,27 @@ export default function BetCard() {
         const output = makeSales(buyOrders, sellOrders)
         applySalesOutput(output)
         chart.current.drawChart()
-    }, [buyOrders.length, sellOrders.length])
+    }, [buyOrders.size, sellOrders.size])
 
     useEffect(() => {
         const intervalId = setInterval(() => {
-           const order = generateRandomOrder(peek(salesRef.current)?.price ?? 10)
+           const order = generateRandomOrder(peek(salesRef.current)?.price ?? 100)
             if (order.type === "buy") {
-                setBuyOrders(prev => [...prev, order])
+                setBuyOrders(p => addToOrderMap(p, order.price, order))
             } else {
-                setSellOrders(prev => [...prev, order])
+                setSellOrders(p => addToOrderMap(p, order.price, order))
             }
-        }, 10)
+        }, 100)
+ 
+        if(!autoOrders) clearInterval(intervalId)
         return () => clearInterval(intervalId)
-    }, [])
+    }, [autoOrders])
 
     function applySalesOutput(output: SaleStepOutput){
         setSales([...sales, ...output.sales])
         output?.sales.forEach(s => chart.current!.addXY("", s.price))
-        setBuyOrders([...output.remainingBuyOrders])
-        setSellOrders([...output.remainingSellOrders])
+        setBuyOrders(output.remainingBuyOrders)
+        setSellOrders(output.remainingSellOrders)
     }
 
 
@@ -87,7 +92,7 @@ export default function BetCard() {
                     <Button 
                         label="Buy" 
                         onPress={() => {
-                            setBuyOrders(p => [...p, {type: "buy", amount: Number(amount), price: Number(price)}])
+                            setBuyOrders(p => addToOrderMap(p, Number(price), {id: crypto.randomUUID(), type: "buy", amount: Number(amount), price: Number(price)}))
                             setAmount(""); setPrice("")
                         }} 
                         style="w-full"
@@ -95,10 +100,15 @@ export default function BetCard() {
                     <Button 
                         label="Sell" 
                         onPress={() => {
-                            setSellOrders(p => [...p, {type: "sell", amount: Number(amount) , price: Number(price)}])
+                            setSellOrders(p => addToOrderMap(p, Number(price), {id: crypto.randomUUID(), type: "sell", amount: Number(amount), price: Number(price)}))
                             setAmount(""); setPrice("")
                         }} 
                         style="bg-red-500 w-full"
+                    />
+                    <Button 
+                        label={autoOrders ? "Pause" : "Start"}
+                        onPress={() => setAutoOrders(!autoOrders)} 
+                        style="bg-orange-500 w-full"
                     />
                 </div>
             </div>
@@ -112,7 +122,7 @@ export default function BetCard() {
                             <p className="font-mono text-gray-300 text-xs">
                                 Buy
                             </p>
-                            {buyOrders.filter(o => o.type == "buy").sort((a, b) => a.price - b.price).slice(-10).map(o => {
+                            {Array.from(buyOrders.values()).filter(o => o.type == "buy").sort((a, b) => a.price - b.price).slice(-10).map(o => {
                                 return(
                                     <div>
                                         <p className="font-mono text-xs text-green-500">
@@ -123,7 +133,7 @@ export default function BetCard() {
                             })}
                         </div>
                         <div>
-                            {sellOrders.filter(o => o.type == "sell").sort((a, b) => a.price - b.price).slice(0, 10).map(o => {
+                            {Array.from(sellOrders.values()).filter(o => o.type == "sell").sort((a, b) => a.price - b.price).slice(0, 10).map(o => {
                                 return(
                                     <div>
                                         <p className="font-mono text-xs text-red-500">
