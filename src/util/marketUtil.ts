@@ -13,9 +13,8 @@ export function makeSales(buyOrders: Map<number, Order>, sellOrders: Map<number,
     while(buys.length != 0 && sells.length != 0){
         const bestSell = peek(sells)
         const bestBuy = peek(buys)
-        console.log(bestBuy)
-        console.log(bestSell)
-        if(bestBuy < bestSell) break
+
+        if(bestBuy.price < bestSell.price) break
         const maxSharedAmt = Math.min(bestBuy.amount, bestSell.amount)
 
         sales.push({
@@ -36,10 +35,17 @@ export function makeSales(buyOrders: Map<number, Order>, sellOrders: Map<number,
     return {remainingSellOrders: orderArrToMap(sells), remainingBuyOrders: orderArrToMap(buys), sales}
 }
 
-export function generateRandomOrder(marketPrice: number): Order{
+let artificialMarketPrice = 100
+function updateMarketPrice(){
+    let pressure = Math.random()
+    artificialMarketPrice += pressure < 0.5 ? 1 : -1
+}
+
+export function generateRandomOrder(): Order{
+    updateMarketPrice()
     const orderType = Math.random() < 0.5 ? "buy" : "sell"
     const orderAmount = Math.round(Math.random()*100)
-    const orderPrice = Math.round(marketPrice + Math.random() * 100)/100
+    const orderPrice = Math.round((artificialMarketPrice + Math.random()) * 100)/100
     
     return {id: crypto.randomUUID(), type: orderType, amount: orderAmount, price: orderPrice}
 }
@@ -49,5 +55,5 @@ export function orderArrToMap(arr: Order[]){
 }
 
 export function orderToString(order: Order){
-    return `[${order.price} x ${order.amount}]-[${order.type}] ID: ${order.id}`
+    return `[${order.price} x ${order.amount}]-[${order.type}]`
 }

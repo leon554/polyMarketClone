@@ -4,8 +4,10 @@ import { Chart} from "chart-le"
 import { getChartParameters } from "../util/chartUtil"
 import Button from "./Button"
 import { generateRandomOrder, makeSales} from "../util/marketUtil"
-import { peek } from "../util/util"
 import { addToOrderMap} from "../util/util"
+import OrderBook from "./OrderBook"
+import SalesCard from "./SalesCard"
+import StatsCard from "./StatsCard"
 
 export default function BetCard() {
     const canvasID = useRef<HTMLCanvasElement | null>(null)
@@ -15,8 +17,8 @@ export default function BetCard() {
     const [price, setPrice] = useState<string>("")
     const [amount, setAmount] = useState<string>("")
     const [sales, setSales] = useState<Sale[]>([])
-    const salesRef = useRef(sales)
     const [autoOrders, setAutoOrders] = useState(false)
+    const acumulator = useRef<Sale[]>([])
 
     useEffect(() => {
         const canvas = canvasID.current as HTMLCanvasElement
@@ -31,7 +33,7 @@ export default function BetCard() {
 
     useEffect(() => {
         const intervalId = setInterval(() => {
-           const order = generateRandomOrder(peek(salesRef.current)?.price ?? 100)
+           const order = generateRandomOrder()
             if (order.type === "buy") {
                 setBuyOrders(p => addToOrderMap(p, order.price, order))
             } else {
@@ -45,7 +47,11 @@ export default function BetCard() {
 
     function applySalesOutput(output: SaleStepOutput){
         setSales([...sales, ...output.sales])
-        output?.sales.forEach(s => chart.current!.addXY("", s.price))
+        acumulator.current.push(...output.sales)
+        if(acumulator.current.length >= 10){
+            chart.current!.addXY("", acumulator.current.reduce((a, c) => a + c.price, 0)/acumulator.current.length)
+            acumulator.current = []
+        }
         setBuyOrders(output.remainingBuyOrders)
         setSellOrders(output.remainingSellOrders)
     }
@@ -67,8 +73,8 @@ export default function BetCard() {
                         </p>
                         <input
                             type="number"
-                            className="bg-slate-100 rounded-sm font-mono outline-none focus:outline-none 
-                            focus:ring-0 focus:border-transparent w-20"
+                            className="bg-neutral-700 text-gray-300 px-1 rounded-sm font-mono outline-none focus:outline-none 
+                            focus:ring-0 focus:border-transparent"
                             step={0.1}
                             value={Number(price)}
                             onChange={v => setPrice(v.currentTarget.value)}
@@ -80,8 +86,8 @@ export default function BetCard() {
                         </p>
                         <input
                             type="number"
-                            className="bg-slate-100 rounded-sm font-mono outline-none focus:outline-none 
-                            focus:ring-0 focus:border-transparent w-20"
+                            className="bg-neutral-700 text-gray-300 px-1 w-full rounded-sm font-mono outline-none focus:outline-none 
+                            focus:ring-0 focus:border-transparent"
                             step={1}
                             value={Number(amount)}
                             onChange={v => setAmount(v.currentTarget.value)}
@@ -112,58 +118,19 @@ export default function BetCard() {
                     />
                 </div>
             </div>
-            <div className="flex w-full justify-between">
-                <div className="flex flex-col gap-3 bg-neutral-600 m-4 mt-0 p-4 rounded-lg w-full">
-                    <p className="text-white font-mono">
-                        Orders
-                    </p>
-                    <div className="flex flex-col gap-4 max-h-70 overflow-y-scroll">
-                        <div>
-                            <p className="font-mono text-gray-300 text-xs">
-                                Buy
-                            </p>
-                            {Array.from(buyOrders.values()).filter(o => o.type == "buy").sort((a, b) => a.price - b.price).slice(-10).map(o => {
-                                return(
-                                    <div>
-                                        <p className="font-mono text-xs text-green-500">
-                                            ${o.price} x {o.amount}
-                                        </p>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                        <div>
-                            {Array.from(sellOrders.values()).filter(o => o.type == "sell").sort((a, b) => a.price - b.price).slice(0, 10).map(o => {
-                                return(
-                                    <div>
-                                        <p className="font-mono text-xs text-red-500">
-                                            ${o.price} x {o.amount}
-                                        </p>
-                                    </div>
-                                )
-                            })}
-                            <p className="font-mono text-gray-300 text-xs">
-                                Sell
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex flex-col gap-3 bg-neutral-600 m-4 mt-0 p-4 rounded-lg w-full">
-                    <p className="text-white font-mono">
-                        Sales
-                    </p>
-                    <div className="max-h-70 overflow-y-scroll">
-                        {sales.slice(-20).reverse().map(s => {
-                            return(
-                                <div>
-                                    <p className="font-mono text-xs text-red-500">
-                                        ${s.price} x {s.amount}
-                                    </p>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
+            <div className="flex flex-col w-full">
+                <StatsCard
+                    buyOrders={buyOrders}
+                    sellOrders={sellOrders}
+                    sales={sales}
+                />
+                <OrderBook
+                    buyOrders={buyOrders}
+                    sellOrders={sellOrders}
+                />
+                <SalesCard
+                    sales={sales}
+                />
             </div>
         </div>
     )
